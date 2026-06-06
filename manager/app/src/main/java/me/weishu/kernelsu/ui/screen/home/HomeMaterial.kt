@@ -480,21 +480,6 @@ private fun InfoCard(systemInfo: SystemInfo) {
             )
 
             InfoCardItem(
-                icon = Icons.Outlined.Memory,
-                label = stringResource(R.string.home_kernel),
-                content = systemInfo.kernelVersion
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            InfoCardItem(
-                icon = Icons.Outlined.PhoneAndroid,
-                label = stringResource(R.string.home_device_model),
-                content = systemInfo.deviceModel
-            )
-
-            Spacer(Modifier.height(16.dp))
-            InfoCardItem(
                 icon = {
                     Icon(
                         painter = painterResource(if (isOfficial) R.drawable.ic_launcher_foreground else R.drawable.ic_launcher_kowsu),
@@ -505,6 +490,13 @@ private fun InfoCard(systemInfo: SystemInfo) {
                 },
                 label = stringResource(R.string.home_manager_version),
                 content = systemInfo.managerVersion
+            )
+
+            Spacer(Modifier.height(16.dp))
+            InfoCardItem(
+                icon = Icons.Outlined.Memory,
+                label = stringResource(R.string.home_kernel),
+                content = systemInfo.kernelVersion
             )
 
             Spacer(Modifier.height(16.dp))
@@ -525,20 +517,6 @@ private fun InfoCard(systemInfo: SystemInfo) {
                 icon = Icons.Outlined.VerifiedUser,
                 label = stringResource(R.string.home_selinux_status),
                 content = selinuxDisplay
-            )
-
-            Spacer(Modifier.height(16.dp))
-            val seccompDisplay = when (systemInfo.seccompStatus) {
-                -1 -> stringResource(R.string.seccomp_status_not_supported)
-                0 -> stringResource(R.string.seccomp_status_disabled)
-                1 -> stringResource(R.string.seccomp_status_strict)
-                2 -> stringResource(R.string.seccomp_status_filter)
-                else -> stringResource(R.string.seccomp_status_unknown)
-            }
-            InfoCardItem(
-                icon = Icons.Outlined.LocalPolice,
-                label = stringResource(R.string.home_seccomp_status),
-                content = seccompDisplay
             )
         }
     }

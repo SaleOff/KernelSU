@@ -464,7 +464,6 @@ private fun InfoCard(systemInfo: SystemInfo) {
         ) {
             InfoText(title = stringResource(R.string.home_manager_version), content = systemInfo.managerVersion)
             InfoText(title = stringResource(R.string.home_kernel), content = systemInfo.kernelVersion)
-            InfoText(title = stringResource(R.string.home_device_model), content = systemInfo.deviceModel)
             InfoText(title = stringResource(R.string.home_fingerprint), content = systemInfo.fingerprint)
             val selinuxDisplay = when (systemInfo.selinuxStatus) {
                 "Enforcing" -> stringResource(R.string.selinux_status_enforcing)
@@ -475,17 +474,6 @@ private fun InfoCard(systemInfo: SystemInfo) {
             InfoText(
                 title = stringResource(R.string.home_selinux_status),
                 content = selinuxDisplay,
-            )
-            val seccompDisplay = when (systemInfo.seccompStatus) {
-                -1 -> stringResource(R.string.seccomp_status_not_supported)
-                0 -> stringResource(R.string.seccomp_status_disabled)
-                1 -> stringResource(R.string.seccomp_status_strict)
-                2 -> stringResource(R.string.seccomp_status_filter)
-                else -> stringResource(R.string.seccomp_status_unknown)
-            }
-            InfoText(
-                title = stringResource(R.string.home_seccomp_status),
-                content = seccompDisplay,
                 bottomPadding = 0.dp
             )
         }

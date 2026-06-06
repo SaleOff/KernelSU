@@ -2,38 +2,11 @@ name: Build Manager
 
 on:
   push:
-    branches: [ "main", "dev", "ci", "master" ]
-    paths:
-      - 'README.md'
-      - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
-      - '.github/workflows/ddk-lkm.yml'
-      - '.github/workflows/ksud.yml'
-      - '.github/workflows/ksud-extra.yml'
-      - '.github/scripts/setup-rust-build.sh'
-      - 'repack_apk.py'
-      - 'manager/**'
-      - 'kernel/**'
-      - 'userspace/**'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'scripts/ksubot.py'
-  pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "sign" ]
     paths:
       - '.github/workflows/build-manager.yml'
-      - '.github/workflows/build-lkm.yml'
-      - '.github/workflows/ddk-lkm.yml'
-      - '.github/workflows/ksud.yml'
-      - '.github/workflows/ksud-extra.yml'
-      - '.github/scripts/setup-rust-build.sh'
-      - 'repack_apk.py'
       - 'manager/**'
-      - 'kernel/**'
       - 'userspace/**'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'scripts/ksubot.py'
   workflow_call:
   workflow_dispatch:
 
@@ -93,60 +66,20 @@ jobs:
           echo "Certificate size: $SIZE_HEX ($SIZE_DEC bytes)"
           echo "Certificate hash: $HASH"
 
-  build-lkm:
-    needs: generate-key
-    uses: ./.github/workflows/build-lkm.yml
-    with:
-      expected_size2: ${{ needs.generate-key.outputs.expected_size || '' }}
-      expected_hash2: ${{ needs.generate-key.outputs.expected_hash || '' }}
-    secrets: inherit
-
-  build-xx-lkm:
-    needs: generate-key
-    uses: ./.github/workflows/build-xx-lkm.yml
-    with:
-      expected_size2: ${{ needs.generate-key.outputs.expected_size || '' }}
-      expected_hash2: ${{ needs.generate-key.outputs.expected_hash || '' }}
-    secrets: inherit
-
-  build-ksuinit:
-    uses: ./.github/workflows/ksuinit.yml
-
   build-ksud:
-    needs: [build-lkm, build-xx-lkm, build-ksuinit]
     strategy:
       matrix:
         include:
           - target: aarch64-linux-android
+            os: ubuntu-latest
           - target: armv7-linux-androideabi
-          - target: x86_64-linux-android
+            os: ubuntu-latest
+
     uses: ./.github/workflows/ksud.yml
     with:
       target: ${{ matrix.target }}
-      pack_lkm: true
-      pack_ksuinit: true
-  
-  build-ksud-extra:
-    needs: [build-lkm, build-xx-lkm, build-ksuinit]
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-pc-windows-gnu # windows pc
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin # Intel mac
-            os: macos-latest
-          - target: aarch64-apple-darwin # M chip mac
-            os: macos-latest
-          - target: aarch64-unknown-linux-musl # arm64 Linux
-            os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl # x86 Linux
-            os: ubuntu-latest
-    uses: ./.github/workflows/ksud-extra.yml
-    with:
-      target: ${{ matrix.target }}
-      os: ${{ matrix.os }}
-      pack_lkm: true
-      pack_ksuinit: true
+      pack_lkm: false
+      pack_ksuinit: false
 
   build-manager:
     needs: [generate-key]
@@ -163,17 +96,14 @@ jobs:
           fetch-depth: 0
 
       - name: Write key
-        if: ${{ github.event_name != 'pull_request' || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         run: |
-          if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
             {
-              echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
-              echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
-              echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+              echo KEYSTORE_PASSWORD='Hello@5678'
+              echo KEY_ALIAS='cafes'
+              echo KEY_PASSWORD='Hello@5678'
               echo KEYSTORE_FILE='key.jks'
             } >> gradle.properties
-            echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
-          fi
 
       - name: Write PR key
         if: github.event_name == 'pull_request'
@@ -205,13 +135,13 @@ jobs:
       - name: Build with Gradle
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew assembleRelease -PIS_PR_BUILD=true
+            ./gradlew clean assembleRelease --stacktrace -PIS_PR_BUILD=true
           else
-            ./gradlew assembleRelease
+            ./gradlew clean assembleRelease --stacktrace
           fi
 
       - name: Upload build artifact
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request') || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         uses: actions/upload-artifact@v7
         with:
           name: manager-gradle
@@ -219,7 +149,7 @@ jobs:
 
       - name: Upload mappings
         uses: actions/upload-artifact@v7
-        if: ${{ ( github.event_name != 'pull_request') || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         with:
           name: "mappings"
           path: "manager/app/build/outputs/mapping/release/"
@@ -265,12 +195,6 @@ jobs:
           name: ksud-armv7-linux-androideabi
           path: artifacts/ksud-armv7-linux-androideabi
 
-      - name: Download x86_64 ksud
-        uses: actions/download-artifact@v8
-        with:
-          name: ksud-x86_64-linux-android
-          path: artifacts/ksud-x86_64-linux-android
-
       - name: Place manager apk and ksud artifacts
         run: |
           mkdir -p manager/app/build/outputs/apk/release
@@ -280,52 +204,29 @@ jobs:
 
           mkdir -p target/aarch64-linux-android/release
           mkdir -p target/armv7-linux-androideabi/release
-          mkdir -p target/x86_64-linux-android/release
           ARM64_KSUD=$(find artifacts/ksud-aarch64-linux-android -type f -name ksud | head -n 1)
           ARM_KSUD=$(find artifacts/ksud-armv7-linux-androideabi -type f -name ksud | head -n 1)
-          X86_64_KSUD=$(find artifacts/ksud-x86_64-linux-android -type f -name ksud | head -n 1)
           test -n "$ARM64_KSUD"
           test -n "$ARM_KSUD"
-          test -n "$X86_64_KSUD"
           cp -f "$ARM64_KSUD" target/aarch64-linux-android/release/ksud
           cp -f "$ARM_KSUD" target/armv7-linux-androideabi/release/ksud
-          cp -f "$X86_64_KSUD" target/x86_64-linux-android/release/ksud
 
       - name: Prepare signing inputs
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request') || github.ref_type == 'tag' }}
-        env:
-          PR_KEYSTORE: ${{ needs.generate-key.outputs.keystore }}
-          PR_KEYSTORE_PASSWORD: ${{ needs.generate-key.outputs.keystore_password }}
-          PR_KEY_PASSWORD: ${{ needs.generate-key.outputs.key_password }}
-          PROD_KEYSTORE: ${{ secrets.KEYSTORE }}
-          PROD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          PROD_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          PROD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "$PR_KEYSTORE" | base64 -d > pr-key.jks
-            echo "SIGN_KEYSTORE_FILE=pr-key.jks" >> $GITHUB_ENV
-            echo "SIGN_KEY_ALIAS=pr-key" >> $GITHUB_ENV
-            echo "SIGN_KEYSTORE_PASSWORD=$PR_KEYSTORE_PASSWORD" >> $GITHUB_ENV
-            echo "SIGN_KEY_PASSWORD=$PR_KEY_PASSWORD" >> $GITHUB_ENV
-          else
-            test -n "$PROD_KEYSTORE"
-            echo "$PROD_KEYSTORE" | base64 -d > key.jks
-            echo "SIGN_KEYSTORE_FILE=key.jks" >> $GITHUB_ENV
-            echo "SIGN_KEY_ALIAS=$PROD_KEY_ALIAS" >> $GITHUB_ENV
-            echo "SIGN_KEYSTORE_PASSWORD=$PROD_KEYSTORE_PASSWORD" >> $GITHUB_ENV
-            echo "SIGN_KEY_PASSWORD=$PROD_KEY_PASSWORD" >> $GITHUB_ENV
-          fi
+          echo "SIGN_KEYSTORE_FILE=manager/key.jks" >> $GITHUB_ENV
+          echo "SIGN_KEY_ALIAS=cafes" >> $GITHUB_ENV
+          echo "SIGN_KEYSTORE_PASSWORD=Hello@5678" >> $GITHUB_ENV
+          echo "SIGN_KEY_PASSWORD=Hello@5678" >> $GITHUB_ENV
 
       - name: Repack and resign
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request') || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         run: |
           python3 repack_apk.py repack \
             -b release \
             -t release \
             -a arm64-v8a \
             -a armeabi-v7a \
-            -a x86_64 \
             -K "$SIGN_KEYSTORE_FILE" \
             -A "$SIGN_KEY_ALIAS" \
             -P "$SIGN_KEYSTORE_PASSWORD" \
@@ -333,34 +234,8 @@ jobs:
             --strip
 
       - name: Upload build artifact
-        if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request') || github.ref_type == 'tag' }}
+        if: ${{ ( github.event_name != 'pull_request' ) || github.ref_type == 'tag' }}
         uses: actions/upload-artifact@v7
         with:
           name: manager
           path: dist/*.apk
-
-      - name: Bot session cache
-        if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'
-        id: bot_session_cache
-        uses: actions/cache@v6
-        with:
-          path: scripts/ksubot.session
-          key: ${{ runner.os }}-bot-session
-
-      - name: Upload to telegram
-        if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'
-        env:
-          CHAT_ID: ${{ vars.CHAT_ID }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          MESSAGE_THREAD_ID: ${{ vars.MESSAGE_THREAD_ID }}
-          GITHUB_EVENT: ${{ toJson(github.event) }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TITLE: Manager
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
-            export VERSION=$(git rev-list --count HEAD)
-            APK=$(find ./dist -name "*.apk")
-            pip3 install telethon
-            python3 $GITHUB_WORKSPACE/scripts/ksubot.py $APK
-          fi
