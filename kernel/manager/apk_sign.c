@@ -362,8 +362,8 @@ bool is_manager_apk(char *path)
 	if (check_v2_signature(path, EXPECTED_SIZE, EXPECTED_HASH))
 		return true;
 
-	// KOWX712/KernelSU
-	if (check_v2_signature(path, 0x375, "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"))
+	// SaleOff/KernelSU
+	if (check_v2_signature(path, 0x29c, "f6e2e4a50176889d4affd486d7b50fc3216eb4c0ba16d8cac29d0478dbbe31f3"))
 		return true;
 
 	return false;
